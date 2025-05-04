@@ -1,4 +1,3 @@
-// Module: graph.rs
 // Defines the Graph structure and methods for adding edges and computing neighbors, nodes, and edges.
 
 use std::collections::HashMap;

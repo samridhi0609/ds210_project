@@ -1,4 +1,3 @@
-// Module: centrality.rs
 // Implements closeness and degree centrality calculations for ranking node importance.
 
 use std::collections::{HashMap, VecDeque};
