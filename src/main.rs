@@ -1,0 +1,104 @@
+// File: main.rs
+// This is the main entry point. It loads the dataset, builds the graph, computes centralities,
+// performs delay analysis, and prints results.
+
+use std::error::Error;
+use csv::Reader;
+use crate::graph::Graph;
+use crate::centrality::{closeness_centrality, degree_centrality};
+use crate::delay_analysis::analyze_delays;
+
+mod graph;
+mod centrality;
+mod delay_analysis;
+
+/// Struct: AirportFlight
+/// Represents a single flight record with carrier, airport, and delay details.
+#[derive(Debug)]
+pub struct AirportFlight {
+    carrier_name: String,
+    airport_name: String,
+    carrier_delay: f64,
+    weather_delay: f64,
+    nas_delay: f64,
+    security_delay: f64,
+    late_aircraft_delay: f64,
+}
+
+/// Reads the CSV dataset and returns a vector of AirportFlight.
+/// Inputs: file path string.
+/// Outputs: Vec of AirportFlight or error.
+/// Uses csv crate to parse records.
+fn read_csv(file_path: &str) -> Result<Vec<AirportFlight>, Box<dyn Error>> {
+    let mut reader = Reader::from_path(file_path)?;
+    let mut flights = Vec::new();
+
+    for result in reader.records() {
+        let record = result?;
+        // Mapping each column into the AirportFlight struct, converting delay fields.
+        flights.push(AirportFlight {
+            carrier_name: record.get(2).unwrap_or("").to_string(),
+            airport_name: record.get(4).unwrap_or("").to_string(),
+            carrier_delay: record.get(15).unwrap_or("0").parse().unwrap_or(0.0),
+            weather_delay: record.get(16).unwrap_or("0").parse().unwrap_or(0.0),
+            nas_delay: record.get(17).unwrap_or("0").parse().unwrap_or(0.0),
+            security_delay: record.get(18).unwrap_or("0").parse().unwrap_or(0.0),
+            late_aircraft_delay: record.get(19).unwrap_or("0").parse().unwrap_or(0.0),
+        });
+    }
+
+    Ok(flights)
+}
+
+fn main() {
+    // Step 1: Load dataset
+    let flights = read_csv("Airline_Delay_Cause.csv").expect("Failed to load data");
+    println!("Loaded {} flight records.", flights.len());
+
+    // Step 2: Build graph from carrier-airport connections
+    let mut graph = Graph::new();
+    for flight in &flights {
+        graph.add_edge(&flight.carrier_name, &flight.airport_name);
+    }
+    println!("Graph built with {} nodes and {} edges.", graph.node_count(), graph.edge_count());
+
+    // Step 3: Compute centrality measures
+    let closeness = closeness_centrality(&graph);
+    let degree = degree_centrality(&graph);
+
+    // Step 4: Analyze delays
+    let delays = analyze_delays(&flights);
+
+    // Step 5: Print results
+    println!("\nTop by closeness centrality:");
+    print_top_10(&closeness);
+
+    println!("\nTop by degree centrality:");
+    print_top_10_usize(&degree);
+
+    println!("\nTop 10 airports by delay category:");
+    for (category, top_airports) in delays {
+        println!("\n{}:", category);
+        for (airport, value) in top_airports {
+            println!("{}: {:.2}", airport, value);
+        }
+    }
+}
+
+/// Helper to print top 10 f64 metrics.
+fn print_top_10(map: &std::collections::HashMap<String, f64>) {
+    let mut vec: Vec<_> = map.iter().collect();
+    vec.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+    for (k, v) in vec.iter().take(10) {
+        println!("{}: {:.4}", k, v);
+    }
+}
+
+/// Helper to print top 10 usize metrics.
+fn print_top_10_usize(map: &std::collections::HashMap<String, usize>) {
+    let mut vec: Vec<_> = map.iter().collect();
+    vec.sort_by(|a, b| b.1.cmp(a.1));
+    for (k, v) in vec.iter().take(10) {
+        println!("{}: {}", k, v);
+    }
+}
